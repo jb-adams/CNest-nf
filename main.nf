@@ -1,6 +1,15 @@
 #!/usr/bin/env nextflow
 
+process echo {
+  script:
+  """
+  echo -e "This is the GA4GH DRS + WES refactor branch"
+  """
+}
+
 // Re-usable componext for adding a helpful help message in our Nextflow script
+
+/*
 def helpMessage() {
     log.info"""
     Usage:
@@ -53,12 +62,15 @@ if (params.wgs) {
 } else {
   mem_factor = 1
 }
+*/
+
 /*
 ================================================================================
                                 Set parameters
 ================================================================================
 */
 
+/*
 if (params.bed) ch_bed = Channel.value(file(params.bed))
 if (params.ref) ch_ref = Channel.value(file(params.ref))
 if (params.design) {
@@ -125,12 +137,15 @@ if (params.cov) ch_cov = Channel.value(file(params.cov))
 // Test mode
 if (params.test && params.design) ch_files_sets = ch_files_sets.take(5)
 if (params.test && (params.bindir || params.binlist || params.rbindir || params.samples)) ch_sample_names = ch_sample_names.take(5)
+*/
 
 /*
 ================================================================================
                                 File staging
 ================================================================================
 */
+
+/*
 if (params.binlist) {
   process stage_bins {
       echo true
@@ -153,12 +168,15 @@ if (params.binlist) {
       '''
   }
 }
+*/
 
 /*
 ================================================================================
                                 Main parts
 ================================================================================
 */
+
+/*
 if (params.part == 0) {
   ch_bedgz = Channel.value(file("$baseDir/data/hg38.1kb.baits.bed.gz"))
 
@@ -334,3 +352,4 @@ if (params.part == 4){
     """
   }
 }
+*/
