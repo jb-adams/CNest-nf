@@ -73,7 +73,7 @@ while(iterate) {
       
     } else {
       iterate = false
-      print("Invalid parameter set: " + aln_param + " and/or " + idx_param + " not specified, but " name_param + " was specified, exiting")
+      print("Invalid parameter set: " + aln_param + " and/or " + idx_param + " not specified, but " + name_param + " was specified, exiting")
       exit 1, helpMessage()
     }
 
