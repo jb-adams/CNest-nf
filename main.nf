@@ -1,50 +1,19 @@
 #!/usr/bin/env nextflow
 
-process echo {
-  script:
-  """
-  echo -e "This is the GA4GH DRS + WES refactor branch"
-  """
-}
-
 // Re-usable componext for adding a helpful help message in our Nextflow script
 
-/*
 def helpMessage() {
     log.info"""
     Usage:
     The typical command for running the pipeline is as follows:
     
-    nextflow run main.nf --project test --part 4 
+    nextflow run main.nf --project test
     
     Mandatory arguments:
       --project       [string] Name of the project
-      --part          [int] Part of the workflow to run. One of [1, 2, 3, 4]
-
-
-    Part 1 arguments:
       --ref           [file] Reference FASTA
       --indexb        [file] Index in BED format for fast counting
-      --design        [file] A CSV file with header and three columns (name,cram,crai)
-
-    Part 2 arguments:
-      --index         [file] Index in tab format (index_tab.txt)
-      --bindir        [path] Path to the directory of all bin files
-      --binlist       [file] A txt file with paths to all bin files (one per row)
-
-    Part 3 arguments:
-      --index         [file] Index in tab format (index_tab.txt)
-      --bindir        [path] Path to the directory of all bin files
-      --gender        [file] Gender file from part 2
-      --batch         [int]  Batch size for references
-      --samples       [file] Samples to process
-
-    Part 4 arguments:
-      --rbindir
-      --cordir
-      --index
-      --gender
-      --cov
+      --alnformat     [enum] Alignment file format ('bam', 'cram')
 
     Optional arguments:
       --wgs           [int] indicate the memory factor for WGS
@@ -54,6 +23,22 @@ def helpMessage() {
     """.stripIndent()
 }
 
+/* Unused arguments
+  --index         [file] Index in tab format (index_tab.txt)
+  --bindir        [path] Path to the directory of all bin files
+  --binlist       [file] A txt file with paths to all bin files (one per row)
+  --index         [file] Index in tab format (index_tab.txt)
+  --bindir        [path] Path to the directory of all bin files
+  --gender        [file] Gender file from part 2
+  --batch         [int]  Batch size for references
+  --samples       [file] Samples to process
+  --rbindir
+  --cordir
+  --index
+  --gender
+  --cov
+ */
+
 // Show help message
 if (params.help) exit 0, helpMessage()
 
@@ -62,7 +47,59 @@ if (params.wgs) {
 } else {
   mem_factor = 1
 }
+
+/*
+================================================================================
+                                Create design csv
+================================================================================
 */
+
+design_header = "name,bam,bai"
+if (params.alnformat == "cram") {
+  design_header = "name,cram,crai"
+}
+
+i = 0
+iterate = true
+design_body = ""
+while(iterate) {
+  name_param = "name_" + i
+  aln_param = "aln_" + i
+  idx_param = "idx_" + i
+
+  if (params.containsKey(name_param)) {
+    if (params.containsKey(aln_param) && params.containsKey(idx_param)) {
+      design_body = design_body.concat(params[name_param] + "," + params[aln_param] + "," + params[idx_param] + "\n")
+      
+    } else {
+      iterate = false
+      print("Invalid parameter set: " + aln_param + " and/or " + idx_param + " not specified, but " name_param + " was specified, exiting")
+      exit 1, helpMessage()
+    }
+
+  } else {
+    iterate = false
+    if (i == 0) {
+      print("No inputs to populate design file, exiting")
+      exit 1, helpMessage()
+    }
+  }
+
+  i++
+}
+design_body = design_body.substring(0, design_body.length() - 1)
+
+
+process make_design_csv {
+  output:
+  file 'design.csv' into design_file
+
+  script:
+  """
+  echo -e "${design_header}" > design.csv
+  echo -e "${design_body}" >> design.csv
+  """
+}
 
 /*
 ================================================================================
