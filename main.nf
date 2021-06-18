@@ -1,23 +1,26 @@
 #!/usr/bin/env nextflow
 
-// Re-usable componext for adding a helpful help message in our Nextflow script
+/*
+================================================================================
+                                Workflow Help
+================================================================================
+*/
+
+// Re-usable component for adding a helpful help message in our Nextflow script
 
 def helpMessage() {
     log.info"""
     Usage:
     The typical command for running the pipeline is as follows:
     
-    nextflow run main.nf --project test
+    nextflow run main.nf --alnformat bam --ref /path/to/reference.fa
     
     Mandatory arguments:
-      --project       [string] Name of the project
-      --ref           [file] Reference FASTA
-      --indexb        [file] Index in BED format for fast counting
       --alnformat     [enum] Alignment file format ('bam', 'cram')
+      --ref           [file] Reference FASTA
 
     Optional arguments:
       --wgs           [int] indicate the memory factor for WGS
-      --test          [flag] test mode (use only 5 samples)
       --help          [flag] Show help messages
 
     """.stripIndent()
@@ -25,7 +28,6 @@ def helpMessage() {
 
 /* Unused arguments
   --index         [file] Index in tab format (index_tab.txt)
-  --bindir        [path] Path to the directory of all bin files
   --binlist       [file] A txt file with paths to all bin files (one per row)
   --index         [file] Index in tab format (index_tab.txt)
   --bindir        [path] Path to the directory of all bin files
@@ -50,9 +52,11 @@ if (params.wgs) {
 
 /*
 ================================================================================
-                                Create design csv
+                                Pre-process Setup
 ================================================================================
 */
+
+// Pre-process: create design.csv file and create map
 
 design_header = "name,bam,bai"
 if (params.alnformat == "cram") {
@@ -87,237 +91,125 @@ while(iterate) {
 
   i++
 }
-design_body = design_body.substring(0, design_body.length() - 1)
+File design_file = new File("design.csv")
+design_file.write design_header + "\n"
+design_file << design_body
 
+Channel.fromPath('design.csv')
+  .splitCsv(sep: ',', skip: 1)
+  .map { name, file_path, index_path -> [ name, file(file_path), file(index_path) ] }
+  .set { ch_files_sets }
 
-process make_design_csv {
+// Pre-process: channels for common handled files
+
+if (params.bed) ch_bed = Channel.value(file(params.bed))
+if (params.ref) ch_ref = Channel.value(file(params.ref))
+
+/*
+================================================================================
+                                Main Processes
+================================================================================
+*/
+
+ch_bedgz = Channel.value(file("$baseDir/data/hg38.1kb.baits.bed.gz"))
+
+process step0 {
+
+  input:
+  file(bedgz) from ch_bedgz
+
   output:
-  file 'design.csv' into design_file
+  file("hg38.1kb.baits.bed") into ch_bed
+
+  when:
+  !params.bed
+
+  script:
+  if (params.test)
+    """
+    gzip -cd ${bedgz} | head -1000 > "hg38.1kb.baits.bed"
+    """
+  else
+    """
+    gzip -cd ${bedgz} > "hg38.1kb.baits.bed"
+    """
+}
+
+process make_subdirs {
+  
+  output:
+  path "indexes" into ch_index_dir
+  path "bin" into ch_bin_dir
 
   script:
   """
-  echo -e "${design_header}" > design.csv
-  echo -e "${design_body}" >> design.csv
+  mkdir indexes
+  mkdir bin
+  """
+}
+
+// Step1 create work directory
+process step1 {
+
+  input: 
+  path ch_index_dir
+  file(bed) from ch_bed
+
+  output: 
+  path "indexes/index_tab.txt" into ch_index_tab
+  path "indexes/index.txt" into ch_index
+  path "indexes/index.bed" into ch_index_bed
+
+  script:
+  """
+  cnest.py step1 --project indexes --bed ${bed}
+  """
+}
+
+process step2 {
+  tag "id:${name}-file:${file_path}-index:${index_path}"
+
+  input:
+  set val(name), file(file_path), file(index_path) from ch_files_sets
+  file("genome.fa") from ch_ref
+  path "project/bin" from ch_bin_dir
+  path "project/index.bed" from ch_index_bed
+
+  output:
+  path "project/bin/$name" into bin_paths 
+
+  script:
+  """
+  mkdir -p project/tmp/
+  cnest.py step2 --project project --sample ${name} --input ${file_path} --fasta genome.fa --fast
+  """
+}
+
+process gender_qc {
+  time '10h'
+
+  input:
+  val a from bin_paths.collect()
+  path ch_index_tab
+  path ch_bin_dir
+
+  output:
+  path "gender_qc.txt"
+  path "gender_classification.txt"
+  path "mean_coverage.txt"
+
+  script:
+  """
+  cnest.py step3 \
+    --indextab $ch_index_tab \
+    --bindir $ch_bin_dir \
+    --qc gender_qc.txt \
+    --gender gender_classification.txt \
+    --cov mean_coverage.txt
   """
 }
 
 /*
-================================================================================
-                                Set parameters
-================================================================================
-*/
-
-/*
-if (params.bed) ch_bed = Channel.value(file(params.bed))
-if (params.ref) ch_ref = Channel.value(file(params.ref))
-if (params.design) {
-  Channel.fromPath(params.design)
-    .splitCsv(sep: ',', skip: 1)
-    .map { name, file_path, index_path -> [ name, file(file_path), file(index_path) ] }
-    .set { ch_files_sets }
-}
-
-
-// Directories
-
-// ! bindir and binlist are mutually exclusive
-
-// Path to a folder of bin/rbin/cor files
-if (params.bindir) ch_bin = Channel.value(file(params.bindir))
-if (params.rbindir) ch_rbin = Channel.value(file(params.rbindir))
-if (params.cordir) ch_cor = Channel.value(file(params.cordir))
-
-
-// A txt file with one bin file per row
-if (params.binlist) {
-  Channel
-    .fromPath(params.binlist)
-    .splitText() { it.trim() }
-    .collect()
-    .set {ch_bins}
-}
-
-
-// Sample names
-// If sample names are specified as a file, using it instead of all sample names in bin_dir or rbin_dir
-if (params.samples) {
-  Channel
-    .fromPath(params.samples)
-    .splitText() { it.trim() }
-    .set { ch_sample_names }
-}
-
-if (!params.samples && params.bindir) {
-  all_bins = file(params.bindir).list()
-  ch_sample_names = Channel.from(all_bins)
-}
-
-if (!params.samples && params.rbindir) {
-  all_rbins = file(params.rbindir).list()
-  ch_sample_names = Channel.from(all_rbins)
-}
-
-if (!params.samples && params.binlist) {
-  Channel
-    .fromPath(params.binlist)
-    .splitText() { file(it).baseName.trim() }
-    .set { ch_sample_names }
-}
-
-
-// Helper files
-if (params.index) ch_index = Channel.value(file(params.index))
-if (params.indexb) ch_index_bed = Channel.value(file(params.indexb))
-if (params.gender) ch_gender = Channel.value(file(params.gender))
-if (params.cov) ch_cov = Channel.value(file(params.cov))
-
-// Test mode
-if (params.test && params.design) ch_files_sets = ch_files_sets.take(5)
-if (params.test && (params.bindir || params.binlist || params.rbindir || params.samples)) ch_sample_names = ch_sample_names.take(5)
-*/
-
-/*
-================================================================================
-                                File staging
-================================================================================
-*/
-
-/*
-if (params.binlist) {
-  process stage_bins {
-      echo true
-
-      input:
-        path bins from ch_bins
-      
-      output:
-        file ("bin") into ch_bin
-      
-      shell:
-      '''
-      ls ./ > all_files
-      mkdir -p bin
-      cat ./all_files | while read f
-      do
-          mv $f bin/
-      done
-      rm bin/all_files
-      '''
-  }
-}
-*/
-
-/*
-================================================================================
-                                Main parts
-================================================================================
-*/
-
-/*
-if (params.part == 0) {
-  ch_bedgz = Channel.value(file("$baseDir/data/hg38.1kb.baits.bed.gz"))
-
-  process step0 {
-    tag "${params.project}"
-    echo true
-
-    input:
-    file(bedgz) from ch_bedgz
-
-    output:
-    file("hg38.1kb.baits.bed") into ch_bed
-
-    when:
-    !params.bed
-
-    script:
-    if (params.test)
-      """
-      gzip -cd ${bedgz} | head -1000 > "hg38.1kb.baits.bed"
-      """
-    else
-      """
-      gzip -cd ${bedgz} > "hg38.1kb.baits.bed"
-      """
-  }
-
-  // Step1 create work directory
-  process step1 {
-    tag "${params.project}"
-    publishDir "results/", mode: "copy", pattern: "${params.project}/index*"
-    echo true
-
-    input: 
-    file(bed) from ch_bed
-
-    output: 
-    path "${params.project}/index_tab.txt" into ch_index_tab
-    path "${params.project}/index.txt" into ch_index
-    path "${params.project}/index.bed" into ch_index_bed
-
-    script:
-    """
-    cnest.py step1 --project ${params.project} --bed ${bed}
-    """
-  }
-}
-
-if (params.part == 1) {
-  process step2 {
-    tag "id:${name}-file:${file_path}-index:${index_path}"
-    publishDir "results/", mode: "move"
-    echo true
-
-    input:
-    set val(name), file(file_path), file(index_path) from ch_files_sets
-    file("genome.fa") from ch_ref
-    path "${params.project}/index.bed" from ch_index_bed
-
-    output:
-    path "${params.project}/bin/$name"
-
-    script:
-    if (params.test)
-      """
-      mkdir -p ${params.project}/tmp/ ${params.project}/bin/
-      cnest.py --debug step2 --project ${params.project} --sample ${name} --input ${file_path} --fasta genome.fa --fast
-      """
-    else
-      """
-      mkdir -p ${params.project}/tmp/ ${params.project}/bin/
-      cnest.py step2 --project ${params.project} --sample ${name} --input ${file_path} --fasta genome.fa --fast
-      """
-  }
-}
-
-if (params.part == 2) {
-
-  process gender_qc {
-    echo true
-    publishDir "results/", mode: "move"
-    time '10h'
-
-    input:
-    path bin_dir from ch_bin
-    path index from ch_index
-
-    output:
-    path "gender_qc.txt"
-    path "gender_classification.txt"
-    path "mean_coverage.txt"
-
-    script:
-    """
-      cnest.py step3 \
-      --indextab $index \
-      --bindir $bin_dir \
-      --qc gender_qc.txt \
-      --gender gender_classification.txt \
-      --cov mean_coverage.txt
-    """
-  }
-}
-
 if (params.part == 3) {
   process logR_ratio {
     tag "${sample_name}"
