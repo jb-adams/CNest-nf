@@ -44,10 +44,14 @@ def helpMessage() {
 // Show help message
 if (params.help) exit 0, helpMessage()
 
+batch = 1000
+if (params.batch) {
+  batch = params.batch
+}
+
+mem_factor = 1
 if (params.wgs) {
   mem_factor = params.wgs
-} else {
-  mem_factor = 1
 }
 
 /*
@@ -178,6 +182,7 @@ process step2 {
 
   output:
   path "project/bin/$name" into bin_paths 
+  val(name) into ch_names_sets
 
   script:
   """
@@ -196,7 +201,7 @@ process gender_qc {
 
   output:
   path "gender_qc.txt"
-  path "gender_classification.txt"
+  path "gender_classification.txt" into ch_gender_classification
   path "mean_coverage.txt"
 
   script:
@@ -210,42 +215,44 @@ process gender_qc {
   """
 }
 
-/*
-if (params.part == 3) {
-  process logR_ratio {
-    tag "${sample_name}"
-    echo true
-    publishDir "results/", mode: "move"
-    memory { 1.GB * params.batch * mem_factor / 100 }
-    time { 40.m * params.batch * mem_factor / 100  }
 
-    input:
-    path bin_dir from ch_bin
-    path index from ch_index
-    path gender from ch_gender
-    val sample_name from ch_sample_names
+process logR_ratio {
+  tag "${name}"
+  echo true
+  // memory { 1.GB * params.batch * mem_factor / 100 }
+  // time { 40.m * params.batch * mem_factor / 100  }
 
-    output:
-    path "${params.project}/cor/$sample_name"
-    path "${params.project}/logr/$sample_name"
-    path "${params.project}/rbin/$sample_name"
+  input:
+  path ch_bin_dir
+  path ch_index_tab
+  path ch_gender_classification
+  val(name) from ch_names_sets
+  // path bin_dir from ch_bin
+  // path index from ch_index
+  // path gender from ch_gender
+  // val sample_name from ch_sample_names
 
-    script:
-    """
-      mkdir -p ${params.project}/cor/ ${params.project}/logr/ ${params.project}/rbin/
-      cnest.py step4 \
-        --bindir $bin_dir \
-        --indextab $index \
-        --gender $gender \
-        --sample $sample_name \
-        --batch ${params.batch} \
-        --cordir ${params.project}/cor/ \
-        --logrdir ${params.project}/logr/ \
-        --rbindir ${params.project}/rbin/
-    """
-  }
+  output:
+  path "project/cor/$name"
+  path "project/logr/$name"
+  path "project/rbin/$name"
+
+  script:
+  """
+    mkdir -p project/cor/ project/logr/ project/rbin/
+    cnest.py step4 \
+      --bindir $ch_bin_dir \
+      --indextab $ch_index_tab \
+      --gender $ch_gender_classification \
+      --sample $name \
+      --batch $batch \
+      --cordir project/cor/ \
+      --logrdir project/logr/ \
+      --rbindir project/rbin/
+  """
 }
 
+/*
 if (params.part == 4){
   process hmm_call {
     tag "${sample_name}"
