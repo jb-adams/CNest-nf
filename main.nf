@@ -113,26 +113,27 @@ if (params.ref) ch_ref = Channel.value(file(params.ref))
 
 ch_bedgz = Channel.value(file("$baseDir/data/hg38.1kb.baits.bed.gz"))
 
-process step0 {
+if (!params.bed) {
+  process step0 {
+    input:
+    file(bedgz) from ch_bedgz
 
-  input:
-  file(bedgz) from ch_bedgz
+    output:
+    file("hg38.1kb.baits.bed") into ch_bed
 
-  output:
-  file("hg38.1kb.baits.bed") into ch_bed
+    when:
+    !params.bed
 
-  when:
-  !params.bed
-
-  script:
-  if (params.test)
-    """
-    gzip -cd ${bedgz} | head -1000 > "hg38.1kb.baits.bed"
-    """
-  else
-    """
-    gzip -cd ${bedgz} > "hg38.1kb.baits.bed"
-    """
+    script:
+    if (params.test)
+      """
+      gzip -cd ${bedgz} | head -1000 > "hg38.1kb.baits.bed"
+      """
+    else
+      """
+      gzip -cd ${bedgz} > "hg38.1kb.baits.bed"
+      """
+  }
 }
 
 process make_subdirs {

@@ -30,16 +30,17 @@ fi;
 # ##################################################
 # RUN CNEST ON DOWNSAMPLED 1000 GENOMES DATA
 # ##################################################
-# nextflow run ../../main.nf \
-#     --alnformat cram \
-#     --ref ./path/to/ref \
-#     --name_0 HG00443 --aln_0 ./cram/HG00443.final.2400kb.cram --idx_0 ./cram/HG00443.final.2400kb.cram.crai \
-#     --name_1 HG00445 --aln_1 ./cram/HG00445.final.2400kb.cram --idx_1 ./cram/HG00445.final.2400kb.cram.crai \
-#     --name_2 HG00446 --aln_2 ./cram/HG00446.final.2400kb.cram --idx_2 ./cram/HG00446.final.2400kb.cram.crai \
-#     --name_3 HG00448 --aln_3 ./cram/HG00448.final.2400kb.cram --idx_3 ./cram/HG00448.final.2400kb.cram.crai \
-#     --name_4 HG00449 --aln_4 ./cram/HG00449.final.2400kb.cram --idx_4 ./cram/HG00449.final.2400kb.cram.crai \
-#     --name_5 HG00451 --aln_5 ./cram/HG00451.final.2400kb.cram --idx_5 ./cram/HG00451.final.2400kb.cram.crai \
-#     --name_6 NA12718 --aln_6 ./cram/NA12718.final.2400kb.cram --idx_6 ./cram/NA12718.final.2400kb.cram.crai \
-#     --name_7 NA12748 --aln_7 ./cram/NA12748.final.2400kb.cram --idx_7 ./cram/NA12748.final.2400kb.cram.crai \
-#     --name_8 NA12775 --aln_8 ./cram/NA12775.final.2400kb.cram --idx_8 ./cram/NA12775.final.2400kb.cram.crai \
-#     --name_9 NA12778 --aln_9 ./cram/NA12778.final.2400kb.cram --idx_9 ./cram/NA12778.final.2400kb.cram.crai
+nextflow run ../../main.nf \
+    --alnformat cram \
+    --ref ./ref/GRCh38_full_analysis_set_plus_decoy_hla.fa \
+    --bed ./bed/2400kb.bed \
+    --name_0 HG00443 --aln_0 ./cram/HG00443.final.2400kb.cram --idx_0 ./cram/HG00443.final.2400kb.cram.crai \
+    --name_1 HG00445 --aln_1 ./cram/HG00445.final.2400kb.cram --idx_1 ./cram/HG00445.final.2400kb.cram.crai \
+    --name_2 HG00446 --aln_2 ./cram/HG00446.final.2400kb.cram --idx_2 ./cram/HG00446.final.2400kb.cram.crai \
+    --name_3 HG00448 --aln_3 ./cram/HG00448.final.2400kb.cram --idx_3 ./cram/HG00448.final.2400kb.cram.crai \
+    --name_4 HG00449 --aln_4 ./cram/HG00449.final.2400kb.cram --idx_4 ./cram/HG00449.final.2400kb.cram.crai \
+    --name_5 HG00451 --aln_5 ./cram/HG00451.final.2400kb.cram --idx_5 ./cram/HG00451.final.2400kb.cram.crai \
+    --name_6 NA12718 --aln_6 ./cram/NA12718.final.2400kb.cram --idx_6 ./cram/NA12718.final.2400kb.cram.crai \
+    --name_7 NA12748 --aln_7 ./cram/NA12748.final.2400kb.cram --idx_7 ./cram/NA12748.final.2400kb.cram.crai \
+    --name_8 NA12775 --aln_8 ./cram/NA12775.final.2400kb.cram --idx_8 ./cram/NA12775.final.2400kb.cram.crai \
+    --name_9 NA12778 --aln_9 ./cram/NA12778.final.2400kb.cram --idx_9 ./cram/NA12778.final.2400kb.cram.crai
