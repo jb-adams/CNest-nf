@@ -2,3 +2,6 @@ results/
 .nextflow/
 work/
 *.log*
+
+*.fa
+*.fai
