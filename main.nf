@@ -109,6 +109,10 @@ Channel.fromPath('design.csv')
 if (params.bed) ch_bed = Channel.value(file(params.bed))
 if (params.ref) ch_ref = Channel.value(file(params.ref))
 
+// Pre-process: cor and skipem 
+cor = params.containsKey('cor') ? params.cor : 0.9
+skipem = params.skipem ? true : false
+
 /*
 ================================================================================
                                 Main Processes
@@ -227,10 +231,6 @@ process logR_ratio {
   path ch_index_tab
   path ch_gender_classification
   val(name) from ch_names_sets
-  // path bin_dir from ch_bin
-  // path index from ch_index
-  // path gender from ch_gender
-  // val sample_name from ch_sample_names
 
   output:
   path "project/cor/$name"
@@ -238,18 +238,35 @@ process logR_ratio {
   path "project/rbin/$name"
 
   script:
-  """
-    mkdir -p project/cor/ project/logr/ project/rbin/
-    cnest.py step4 \
-      --bindir $ch_bin_dir \
-      --indextab $ch_index_tab \
-      --gender $ch_gender_classification \
-      --sample $name \
-      --batch $batch \
-      --cordir project/cor/ \
-      --logrdir project/logr/ \
-      --rbindir project/rbin/
-  """
+  if (skipem)
+    """
+      mkdir -p project/cor/ project/logr/ project/rbin/
+      cnest.py step4 \
+        --bindir $ch_bin_dir \
+        --indextab $ch_index_tab \
+        --gender $ch_gender_classification \
+        --sample $name \
+        --batch $batch \
+        --cor $cor \
+        --skipem \
+        --cordir project/cor/ \
+        --logrdir project/logr/ \
+        --rbindir project/rbin/
+    """
+  else
+    """
+      mkdir -p project/cor/ project/logr/ project/rbin/
+      cnest.py step4 \
+        --bindir $ch_bin_dir \
+        --indextab $ch_index_tab \
+        --gender $ch_gender_classification \
+        --sample $name \
+        --batch $batch \
+        --cor $cor \
+        --cordir project/cor/ \
+        --logrdir project/logr/ \
+        --rbindir project/rbin/
+    """
 }
 
 /*
