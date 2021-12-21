@@ -2,3 +2,7 @@ results/
 .nextflow/
 work/
 *.log*
+
+*.fa
+*.fai
+testdata/1000genomes_2400kb/design.csv
