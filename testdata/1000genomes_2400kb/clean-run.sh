@@ -34,6 +34,8 @@ nextflow run ../../main.nf \
     --alnformat cram \
     --ref ./ref/GRCh38_full_analysis_set_plus_decoy_hla.fa \
     --bed ./bed/2400kb.bed \
+    --cor 0 \
+    --skipem \
     --name_0 HG00443 --aln_0 ./cram/HG00443.final.2400kb.cram --idx_0 ./cram/HG00443.final.2400kb.cram.crai \
     --name_1 HG00445 --aln_1 ./cram/HG00445.final.2400kb.cram --idx_1 ./cram/HG00445.final.2400kb.cram.crai \
     --name_2 HG00446 --aln_2 ./cram/HG00446.final.2400kb.cram --idx_2 ./cram/HG00446.final.2400kb.cram.crai \
