@@ -147,32 +147,38 @@ if (!params.bed) {
 process make_subdirs {
   
   output:
-  path "indexes" into ch_index_dir
-  path "bin" into ch_bin_dir
+  path "project" into project_dir
+  path "project/bin" into bin_dir
+  // path "indexes" into index_dir
 
   script:
   """
-  mkdir indexes
-  mkdir bin
+  mkdir -p project/bin
   """
+
+  // mkdir -p indexes
 }
 
 // Step1 create work directory
 process step1 {
 
   input: 
-  path ch_index_dir
+  path project_dir
   file(bed) from ch_bed
 
   output: 
-  path "indexes/index_tab.txt" into ch_index_tab
-  path "indexes/index.txt" into ch_index
-  path "indexes/index.bed" into ch_index_bed
+  path "project/index_tab.txt" into index_tab_file
+  path "project/index.txt" into index_file
+  path "project/index.bed" into index_bed_file
+  // path "indexes/index_tab.txt" into index_tab_file
+  // path "indexes/index.txt" into index_file
+  // path "indexes/index.bed" into index_bed_file
 
   script:
   """
-  cnest.py step1 --project indexes --bed ${bed}
+  cnest.py step1 --project project --bed ${bed}
   """
+  // cnest.py step1 --project indexes --bed ${bed}
 }
 
 process step2 {
@@ -181,12 +187,14 @@ process step2 {
   input:
   set val(name), file(file_path), file(index_path) from ch_files_sets
   file("genome.fa") from ch_ref
-  path "project/bin" from ch_bin_dir
-  path "project/index.bed" from ch_index_bed
+  path project_dir
+  path index_bed_file
+  // path "project/bin" from ch_bin_dir
+  // path "project/index.bed" from ch_index_bed
 
   output:
   path "project/bin/$name" into bin_paths 
-  val(name) into ch_names_sets
+  val(name) into ch_names_sets_0
 
   script:
   """
@@ -200,25 +208,24 @@ process gender_qc {
 
   input:
   val a from bin_paths.collect()
-  path ch_index_tab
-  path ch_bin_dir
+  path index_tab_file
+  path bin_dir
 
   output:
   path "gender_qc.txt"
-  path "gender_classification.txt" into ch_gender_classification
-  path "mean_coverage.txt"
+  path "gender_classification.txt" into gender_classification_file
+  path "mean_coverage.txt" into coverage_file
 
   script:
   """
   cnest.py step3 \
-    --indextab $ch_index_tab \
-    --bindir $ch_bin_dir \
+    --indextab $index_tab_file \
+    --bindir $bin_dir \
     --qc gender_qc.txt \
     --gender gender_classification.txt \
     --cov mean_coverage.txt
   """
 }
-
 
 process logR_ratio {
   tag "${name}"
@@ -227,24 +234,28 @@ process logR_ratio {
   // time { 40.m * params.batch * mem_factor / 100  }
 
   input:
-  path ch_bin_dir
-  path ch_index_tab
-  path ch_gender_classification
-  val(name) from ch_names_sets
+  path project_dir
+  path bin_dir
+  path index_tab_file
+  path gender_classification_file
+  val(name) from ch_names_sets_0
 
   output:
+  path "project/cor" into cor_dir
+  path "project/rbin" into rbin_dir
   path "project/cor/$name"
-  path "project/logr/$name"
   path "project/rbin/$name"
+  path "project/logr/$name"
+  val(name) into ch_names_sets_1
 
   script:
   if (skipem)
     """
       mkdir -p project/cor/ project/logr/ project/rbin/
       cnest.py step4 \
-        --bindir $ch_bin_dir \
-        --indextab $ch_index_tab \
-        --gender $ch_gender_classification \
+        --bindir $bin_dir \
+        --indextab $index_tab_file \
+        --gender $gender_classification_file \
         --sample $name \
         --batch $batch \
         --cor $cor \
@@ -257,9 +268,9 @@ process logR_ratio {
     """
       mkdir -p project/cor/ project/logr/ project/rbin/
       cnest.py step4 \
-        --bindir $ch_bin_dir \
-        --indextab $ch_index_tab \
-        --gender $ch_gender_classification \
+        --bindir $bin_dir \
+        --indextab $index_tab_file \
+        --gender $gender_classification_file \
         --sample $name \
         --batch $batch \
         --cor $cor \
@@ -269,41 +280,55 @@ process logR_ratio {
     """
 }
 
-/*
-if (params.part == 4){
-  process hmm_call {
-    tag "${sample_name}"
-    echo true
-    publishDir "results/", mode: "move"
-    memory { 5.GB * params.batch * mem_factor / 100 }
-    time { 40.m * params.batch * mem_factor / 100  }
+process hmm_call {
+  tag "${name}"
+  echo true
+  // memory { 5.GB * params.batch * mem_factor / 100 }
+  // time { 40.m * params.batch * mem_factor / 100  }
 
-    input:
-    path rbin_dir from ch_rbin
-    path cor_dir from ch_cor
-    path index from ch_index
-    path gender_file from ch_gender
-    path cov_file from ch_cov
-    val sample_name from ch_sample_names
+  input:
+  val(name) from ch_names_sets_1
+  path project_dir
+  path cor_dir
+  path rbin_dir
+  path index_tab_file
+  path gender_classification_file
+  path coverage_file
 
-    output:
-    path "${params.project}/cnv/${sample_name}/${sample_name}_mixed_calls.txt"
-    path "${params.project}/cnv/${sample_name}/${sample_name}_mixed_states.txt"
+  output:
+  path "project/cnv/${name}/${name}_mixed_calls.txt"
+  path "project/cnv/${name}/${name}_mixed_states.txt"
 
-    script:
+  script:
+  if (skipem)
     """
-      echo "Processing sample $sample_name"
-      mkdir -p ${params.project}/cnv/
+      echo "Processing sample $name"
+      mkdir -p project/cnv/
       cnest.py step5 \
-        --indextab $index \
+        --indextab $index_tab_file \
         --rbindir $rbin_dir \
         --cordir $cor_dir \
-        --cnvdir ${params.project}/cnv/ \
-        --cov    $cov_file \
-        --sample $sample_name \
-        --gender $gender_file \
-        --batch $params.batch
+        --cnvdir project/cnv/ \
+        --cov    $coverage_file \
+        --sample $name \
+        --gender $gender_classification_file \
+        --cor $cor \
+        --skipem \
+        --batch $batch
     """
-  }
+  else
+    """
+      echo "Processing sample $name"
+      mkdir -p project/cnv/
+      cnest.py step5 \
+        --indextab $index_tab_file \
+        --rbindir $rbin_dir \
+        --cordir $cor_dir \
+        --cnvdir project/cnv/ \
+        --cov    $coverage_file \
+        --sample $name \
+        --gender $gender_classification_file \
+        --cor $cor \
+        --batch $batch
+    """
 }
-*/
