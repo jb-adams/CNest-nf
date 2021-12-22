@@ -149,14 +149,11 @@ process make_subdirs {
   output:
   path "project" into project_dir
   path "project/bin" into bin_dir
-  // path "indexes" into index_dir
 
   script:
   """
   mkdir -p project/bin
   """
-
-  // mkdir -p indexes
 }
 
 // Step1 create work directory
@@ -170,15 +167,11 @@ process step1 {
   path "project/index_tab.txt" into index_tab_file
   path "project/index.txt" into index_file
   path "project/index.bed" into index_bed_file
-  // path "indexes/index_tab.txt" into index_tab_file
-  // path "indexes/index.txt" into index_file
-  // path "indexes/index.bed" into index_bed_file
 
   script:
   """
   cnest.py step1 --project project --bed ${bed}
   """
-  // cnest.py step1 --project indexes --bed ${bed}
 }
 
 process step2 {
@@ -189,8 +182,6 @@ process step2 {
   file("genome.fa") from ch_ref
   path project_dir
   path index_bed_file
-  // path "project/bin" from ch_bin_dir
-  // path "project/index.bed" from ch_index_bed
 
   output:
   path "project/bin/$name" into bin_paths 
