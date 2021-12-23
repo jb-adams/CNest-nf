@@ -218,6 +218,7 @@ process gender_qc {
   """
 }
 
+/*
 process logR_ratio {
   tag "${name}"
   echo true
@@ -323,3 +324,4 @@ process hmm_call {
         --batch $batch
     """
 }
+*/
